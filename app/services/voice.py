@@ -1049,6 +1049,29 @@ def azure_tts_v2(
     return None
 
 
+DEFAULT_GEMINI_TTS_STYLE = (
+    "Perform this narration like a professional, emotionally invested "
+    "audiobook storyteller, not a flat text-to-speech reader. Genuinely feel "
+    "each moment: let tension, sorrow, warmth, fear, or excitement come "
+    "through in your tone, pacing, pauses, and emphasis, exactly as the "
+    "events of the story call for. Bring the story to life."
+)
+
+
+def _build_gemini_tts_contents(text: str) -> str:
+    """
+    组合 Gemini TTS 的自然语言风格指令与正文文本。
+
+    Gemini 的原生 TTS 模型会把提示词中的语气/情感指令与紧随其后的文本
+    一并理解，并只朗读文本部分——这是官方推荐的"风格提示"用法。默认给出
+    一段偏向"戏剧化讲故事"的指令，让声音带有情感而不是逐字念稿；用户也
+    可以通过 `gemini_tts_style` 配置覆盖成自己想要的风格描述。
+    """
+    style = (config.app.get("gemini_tts_style", "") or "").strip()
+    style = style or DEFAULT_GEMINI_TTS_STYLE
+    return f"{style}\n\n{text}"
+
+
 def gemini_tts(
     text: str,
     voice_name: str,
@@ -1058,14 +1081,14 @@ def gemini_tts(
 ) -> Union[SubMaker, None]:
     """
     使用Google Gemini TTS生成语音
-    
+
     Args:
         text: 要转换的文本
         voice_name: 语音名称，如 "Zephyr", "Puck" 等
         voice_rate: 语音速率（当前未使用）
         voice_file: 输出音频文件路径
         voice_volume: 音频音量（当前未使用）
-        
+
     Returns:
         SubMaker对象或None
     """
@@ -1100,7 +1123,7 @@ def gemini_tts(
         with genai.Client(api_key=api_key) as client:
             response = client.models.generate_content(
                 model="gemini-2.5-flash-preview-tts",
-                contents=text,
+                contents=_build_gemini_tts_contents(text),
                 config=generation_config,
             )
 

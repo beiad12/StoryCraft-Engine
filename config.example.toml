@@ -97,6 +97,10 @@ openai_model_name = ""
 # API key: https://aistudio.google.com/app/apikey
 gemini_api_key = ""
 gemini_model_name = ""
+# Optional: natural-language narration style/emotion instruction sent to
+# Gemini TTS (e.g. "Speak like a tense, whispering thriller narrator").
+# Leave blank to use the built-in dramatic-storyteller default.
+gemini_tts_style = ""
 
 # DeepSeek
 # API key: https://platform.deepseek.com/api_keys

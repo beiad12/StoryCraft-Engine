@@ -212,6 +212,8 @@
     "No voices available for the selected TTS server. Please select another server.": "当前选择的TTS服务器没有可用的声音，请选择其他服务器。",
     "SiliconFlow API Key": "硅基流动 API 密钥（[点击获取](https://cloud.siliconflow.cn/account/ak)）",
     "Gemini API Key": "Google Gemini API 密钥（[点击获取](https://aistudio.google.com/app/apikey)）",
+    "Narration Style (Gemini TTS)": "旁白风格（Gemini TTS）",
+    "Leave blank for a dramatic, emotionally engaged storyteller voice. e.g. 'Speak like a tense, whispering thriller narrator.'": "留空则使用富有情感的戏剧化讲述者声音。例如：“像紧张、低语的惊悚片旁白一样说话。”",
     "MiMo API Key": "小米 MiMo API 密钥（[点击获取](https://mimo.mi.com/docs/zh-CN/quick-start/first-api-call)）",
     "ElevenLabs API Key": "ElevenLabs API 密钥（[点击获取](https://elevenlabs.io/app/settings/api-keys)）",
     "ElevenLabs Model": "ElevenLabs 模型",

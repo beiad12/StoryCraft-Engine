@@ -3250,6 +3250,19 @@ def _render_audio_settings(panel, params):
                 )
                 config.app["gemini_api_key"] = gemini_tts_api_key
 
+                # Gemini 的 TTS 模型会把自然语言风格提示和正文一起理解，只朗读
+                # 正文部分。这里让用户自定义旁白的情感/风格，而不是让声音干读文本。
+                gemini_tts_style = st.text_area(
+                    tr("Narration Style (Gemini TTS)"),
+                    value=config.app.get("gemini_tts_style", ""),
+                    placeholder=tr(
+                        "Leave blank for a dramatic, emotionally engaged storyteller voice. "
+                        "e.g. 'Speak like a tense, whispering thriller narrator.'"
+                    ),
+                    key="gemini_tts_style_input",
+                )
+                config.app["gemini_tts_style"] = gemini_tts_style
+
             # 当选择硅基流动时，显示API key输入框和说明信息
             if tts_mode_enabled and (
                 selected_tts_server == "siliconflow"

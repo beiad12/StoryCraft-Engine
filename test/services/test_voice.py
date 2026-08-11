@@ -482,7 +482,10 @@ class TestVoiceService(unittest.TestCase):
         self.assertLess(sub_maker.offset[0][1], sub_maker.offset[1][1])
         self.assertEqual(captured["client_kwargs"], {"api_key": "test-key"})
         self.assertEqual(captured["model"], "gemini-2.5-flash-preview-tts")
-        self.assertEqual(captured["contents"], text)
+        # 默认情况下应附带情感化的旁白风格提示，而不是把裸文本原样发给模型，
+        # 但字幕/时长仍必须使用未包装的原始文本。
+        self.assertTrue(captured["contents"].endswith(text))
+        self.assertIn(vs.DEFAULT_GEMINI_TTS_STYLE, captured["contents"])
         self.assertEqual(captured["config"].response_modalities, ["AUDIO"])
         voice_config = captured["config"].speech_config.voice_config
         self.assertEqual(
@@ -495,6 +498,81 @@ class TestVoiceService(unittest.TestCase):
         subtitle_content = Path(subtitle_file).read_text(encoding="utf-8")
         self.assertIn("Gemini subtitle generation should work now", subtitle_content)
         self.assertIn("Testing multiple lines", subtitle_content)
+
+    def test_gemini_tts_honors_custom_style_override(self):
+        """
+        用户在配置里填写自己的旁白风格描述后，应该替换默认风格提示，
+        而不是与默认提示拼在一起发给模型。
+        """
+
+        class _InlineData:
+            def __init__(self, data):
+                self.data = data
+
+        class _Part:
+            def __init__(self, data):
+                self.inline_data = _InlineData(data)
+
+        class _Content:
+            def __init__(self, data):
+                self.parts = [_Part(data)]
+
+        class _Candidate:
+            def __init__(self, data):
+                self.content = _Content(data)
+
+        class _Response:
+            def __init__(self, data):
+                self.candidates = [_Candidate(data)]
+
+        captured = {}
+
+        class _FakeModels:
+            def generate_content(self, **kwargs):
+                captured.update(kwargs)
+                tone = (
+                    AudioSegment.silent(duration=500)
+                    .set_frame_rate(24000)
+                    .set_channels(1)
+                    .set_sample_width(2)
+                )
+                return _Response(tone.raw_data)
+
+        class _FakeClient:
+            def __init__(self, **kwargs):
+                self.models = _FakeModels()
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc_value, traceback):
+                return None
+
+        temp_root = Path(tempfile.mkdtemp(prefix="gemini-tts-style-"))
+        self.addCleanup(shutil.rmtree, temp_root, True)
+        voice_file = str(temp_root / "tts-gemini-Puck.mp3")
+        text = "The old sailor stared at the storm."
+        custom_style = "Speak like a weary old sailor, gravelly and slow."
+
+        with patch("google.genai.Client", _FakeClient), patch.object(
+            vs.config,
+            "app",
+            dict(
+                vs.config.app,
+                gemini_api_key="test-key",
+                gemini_tts_style=custom_style,
+            ),
+        ):
+            sub_maker = vs.gemini_tts(
+                text=text,
+                voice_name="Puck",
+                voice_rate=1.0,
+                voice_file=voice_file,
+            )
+
+        self.assertIsNotNone(sub_maker)
+        self.assertEqual(captured["contents"], f"{custom_style}\n\n{text}")
+        self.assertNotIn(vs.DEFAULT_GEMINI_TTS_STYLE, captured["contents"])
 
     def test_mimo_tts_uses_openai_compatible_audio_response(self):
         """

@@ -41,6 +41,12 @@ Generate a script for a video, depending on the subject of the video.
 6. do not include "voiceover", "narrator" or similar indicators of what should be spoken at the beginning of each paragraph or line.
 7. you must not mention the prompt, or anything about the script itself. also, never talk about the amount of paragraphs or lines. just write the script.
 8. respond in the same language as the video subject.
+
+## Voice & Feeling:
+9. write like a human storyteller narrating out loud, not like a report or a list of facts. this will be read by a text-to-speech narrator, so it must sound natural and alive when spoken.
+10. make the reader feel the moment: use concrete, sensory, emotionally specific language instead of flat summary. show what is happening and how it feels, don't just state that it happened.
+11. vary sentence length and rhythm on purpose — short, punchy sentences for tension or impact, longer flowing sentences for calm or reflective moments.
+12. let the emotional tone of the wording itself shift with the story: build suspense where the story is suspenseful, warmth where it is tender, urgency where it is dramatic. do this through word choice and pacing, never through labels, stage directions, or bracketed cues like "(dramatic pause)" or "[sad]" — the words alone must carry the feeling.
 """.strip()
 
 

@@ -212,6 +212,8 @@
     "No voices available for the selected TTS server. Please select another server.": "Không có giọng nói nào cho máy chủ TTS đã chọn. Vui lòng chọn máy chủ khác.",
     "SiliconFlow API Key": "Khóa API SiliconFlow ([Lấy khóa](https://cloud.siliconflow.cn/account/ak))",
     "Gemini API Key": "Khóa API Google Gemini ([Lấy khóa](https://aistudio.google.com/app/apikey))",
+    "Narration Style (Gemini TTS)": "Phong cách Tường thuật (Gemini TTS)",
+    "Leave blank for a dramatic, emotionally engaged storyteller voice. e.g. 'Speak like a tense, whispering thriller narrator.'": "Để trống để có giọng người kể chuyện đầy kịch tính, giàu cảm xúc. Ví dụ: 'Nói như một người dẫn chuyện phim giật gân căng thẳng, thì thầm.'",
     "MiMo API Key": "Khóa API Xiaomi MiMo ([Lấy khóa](https://mimo.mi.com/docs/quick-start/first-api-call))",
     "ElevenLabs API Key": "Khóa API ElevenLabs ([Lấy khóa](https://elevenlabs.io/app/settings/api-keys))",
     "ElevenLabs Model": "Mô Hình ElevenLabs",

@@ -208,6 +208,8 @@
     "No voices available for the selected TTS server. Please select another server.": "В выбранном сервисе озвучки нет доступных голосов. Выберите другой сервис.",
     "SiliconFlow API Key": "API-ключ SiliconFlow ([получить ключ](https://cloud.siliconflow.cn/account/ak))",
     "Gemini API Key": "API-ключ Google Gemini ([получить ключ](https://aistudio.google.com/app/apikey))",
+    "Narration Style (Gemini TTS)": "Стиль повествования (Gemini TTS)",
+    "Leave blank for a dramatic, emotionally engaged storyteller voice. e.g. 'Speak like a tense, whispering thriller narrator.'": "Оставьте пустым для драматичного, эмоционально вовлечённого голоса рассказчика. Например: «Говори как напряжённый, шепчущий рассказчик триллера».",
     "MiMo API Key": "API-ключ Xiaomi MiMo ([получить ключ](https://mimo.mi.com/docs/quick-start/first-api-call))",
     "ElevenLabs API Key": "API-ключ ElevenLabs ([получить ключ](https://elevenlabs.io/app/settings/api-keys))",
     "ElevenLabs Model": "Модель ElevenLabs",
