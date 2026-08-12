@@ -1,6 +1,7 @@
 import os
 import random
 import threading
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any, Callable, List
 from urllib.parse import quote_plus, urlencode, urlsplit, urlunsplit
@@ -756,6 +757,40 @@ def _search_videos_with_cache(
         return items
 
 
+# 素材下载是网络 IO，串行等待每个文件依次下载完是整条生成流水线里最容易
+# "感觉卡住"的一段。这里限制并发数而不是一次性全部并发，避免同时打开过多
+# 连接触发供应商限流，也避免占满出口带宽影响同任务里的其它请求。
+_MATERIAL_DOWNLOAD_MAX_WORKERS = 6
+_MATERIAL_DOWNLOAD_BATCH_SIZE = 6
+
+
+def _download_single_material(item: MaterialInfo, material_directory: str) -> str:
+    """
+    下载单个素材文件。
+
+    异常在这里被捕获并记录，返回空字符串代表下载失败，而不是向上抛出。
+    这样并发批次里一个素材下载失败不会中断同批次其它下载，行为等价于原来
+    串行循环里 per-item try/except 的容错语义。
+    """
+    try:
+        source_info = item.source_info if isinstance(item.source_info, dict) else {}
+        logger.info(
+            f"downloading {item.provider} video: "
+            f"asset_id={source_info.get('asset_id') or 'unknown'}"
+        )
+        saved_video_path = save_video(video_url=item.url, save_dir=material_directory)
+        if saved_video_path:
+            logger.info(f"video saved: {saved_video_path}")
+        return saved_video_path or ""
+    except Exception as e:
+        logger.error(
+            "failed to download material video: "
+            f"provider={item.provider}, error={type(e).__name__}, "
+            f"detail={_redact_request_error(e, item.url)}"
+        )
+        return ""
+
+
 def download_videos(
     task_id: str,
     search_terms: List[str],
@@ -832,19 +867,26 @@ def download_videos(
     if concat_mode_value == VideoConcatMode.random.value:
         random.shuffle(valid_video_items)
 
+    # 按小批次并发下载：先并发下载一批，再检查累计时长是否已够用；不够就
+    # 继续下一批，直到满足音频时长或素材用尽为止。批次内保持 valid_video_items
+    # 原有顺序，下载失败的素材直接跳过，不会影响同批次里其它素材的处理结果。
     total_duration = 0.0
-    for item in valid_video_items:
-        try:
-            source_info = item.source_info if isinstance(item.source_info, dict) else {}
-            logger.info(
-                f"downloading {item.provider} video: "
-                f"asset_id={source_info.get('asset_id') or 'unknown'}"
+    remaining_items = list(valid_video_items)
+    with ThreadPoolExecutor(max_workers=_MATERIAL_DOWNLOAD_MAX_WORKERS) as executor:
+        while remaining_items and total_duration <= audio_duration:
+            batch = remaining_items[:_MATERIAL_DOWNLOAD_BATCH_SIZE]
+            remaining_items = remaining_items[_MATERIAL_DOWNLOAD_BATCH_SIZE:]
+            saved_paths = list(
+                executor.map(
+                    lambda batch_item: _download_single_material(
+                        batch_item, material_directory
+                    ),
+                    batch,
+                )
             )
-            saved_video_path = save_video(
-                video_url=item.url, save_dir=material_directory
-            )
-            if saved_video_path:
-                logger.info(f"video saved: {saved_video_path}")
+            for item, saved_video_path in zip(batch, saved_paths):
+                if not saved_video_path:
+                    continue
                 video_paths.append(saved_video_path)
                 try:
                     material_sources.append(
@@ -865,12 +907,6 @@ def download_videos(
                         f"total duration of downloaded videos: {total_duration} seconds, skip downloading more"
                     )
                     break
-        except Exception as e:
-            logger.error(
-                "failed to download material video: "
-                f"provider={item.provider}, error={type(e).__name__}, "
-                f"detail={_redact_request_error(e, item.url)}"
-            )
     logger.success(f"downloaded {len(video_paths)} videos")
     _persist_material_sources(task_id, material_sources)
     return video_paths

@@ -791,6 +791,65 @@ class TestMaterialTlsVerification(unittest.TestCase):
         self.assertEqual(result, ["/tmp/a1.mp4"])
         self.assertTrue(warning.called)
 
+    def test_download_videos_downloads_concurrently_and_keeps_order(self):
+        """
+        素材下载应该并发进行（而不是逐个等待），但返回顺序仍要和候选素材
+        列表的顺序一致，且累计时长满足音频时长后应停止使用更多素材。
+        """
+        items = [
+            material.MaterialInfo(
+                provider="pexels",
+                url=f"https://v.example/c{i}.mp4",
+                duration=3,
+                source_info={"provider": "pexels", "asset_id": f"c{i}"},
+            )
+            for i in range(5)
+        ]
+
+        in_flight = []
+        max_concurrent = {"value": 0}
+        lock = __import__("threading").Lock()
+
+        def fake_save_video(video_url, save_dir=""):
+            with lock:
+                in_flight.append(video_url)
+                max_concurrent["value"] = max(max_concurrent["value"], len(in_flight))
+            try:
+                # 让下载"停留"一小段时间，制造出如果是串行执行就不可能同时
+                # 出现多个 in-flight 下载的窗口。
+                __import__("time").sleep(0.05)
+            finally:
+                with lock:
+                    in_flight.remove(video_url)
+            return f"/tmp/{video_url.rsplit('/', 1)[-1]}"
+
+        with (
+            patch.dict(config.app, {"material_directory": ""}),
+            patch.object(material, "search_videos_pexels", return_value=items),
+            patch.object(material, "save_video", side_effect=fake_save_video),
+            patch.object(
+                material.material_cache,
+                "load_material_search_cache",
+                return_value=None,
+            ),
+            patch.object(material.material_cache, "save_material_search_cache"),
+            patch.object(material.task_artifacts, "patch_script_data", return_value=True),
+        ):
+            result = material.download_videos(
+                task_id="concurrent-download",
+                search_terms=["city"],
+                source="pexels",
+                audio_duration=7,
+                max_clip_duration=3,
+                # random 模式会先打乱候选列表；这里用 sequential 保持候选
+                # 顺序，专门验证并发下载阶段本身不会打乱结果顺序。
+                video_concat_mode=material.VideoConcatMode.sequential,
+            )
+
+        # 5 秒 * 3 = 大于 7 秒音频时长，需要 3 段素材（9s）才够，第 4/5 段不应下载。
+        self.assertEqual(result, ["/tmp/c0.mp4", "/tmp/c1.mp4", "/tmp/c2.mp4"])
+        self.assertGreater(max_concurrent["value"], 1)
+
 
 class TestCoverrProvider(unittest.TestCase):
     """

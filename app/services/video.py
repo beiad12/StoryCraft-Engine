@@ -312,6 +312,24 @@ def _write_videofile_with_codec_fallback(clip, output_file: str, codec: str, **k
         )
 
 
+_INTERMEDIATE_CLIP_LIBX264_PRESET = "veryfast"
+
+
+def _intermediate_clip_encode_kwargs(codec: str) -> dict:
+    """
+    为逐段中间文件返回额外的编码参数。
+
+    这些临时片段马上会被 `concat_video_clips_with_ffmpeg` 再编码一次合并
+    成片，画质由最终那一次编码决定，所以这里的编码只需要"够用"，没必要
+    使用默认的 `medium` 预设精细压缩。只对软件编码器 libx264 传 `preset`，
+    因为硬件编码器（NVENC/AMF/QSV/VideoToolbox）的预设取值体系不同，
+    有的甚至不接受 `preset` 参数，传错值会直接导致该片段写出失败。
+    """
+    if codec == _DEFAULT_VIDEO_CODEC:
+        return {"preset": _INTERMEDIATE_CLIP_LIBX264_PRESET}
+    return {}
+
+
 def _escape_ffmpeg_concat_path(file_path: str) -> str:
     # concat demuxer 使用单引号包裹路径，路径中的单引号需要先转义。
     return file_path.replace("'", "'\\''")
@@ -695,12 +713,16 @@ def combine_videos(
                 
             # wirte clip to temp file
             clip_file = f"{output_dir}/temp-clip-{i+1}.mp4"
+            configured_codec = _get_configured_video_codec()
+            effective_codec = _get_effective_video_codec(configured_codec)
             _write_videofile_with_codec_fallback(
                 clip,
                 clip_file,
-                codec=_get_configured_video_codec(),
+                codec=configured_codec,
                 logger=None,
                 fps=fps,
+                threads=threads,
+                **_intermediate_clip_encode_kwargs(effective_codec),
             )
 
             # Store clip duration before closing

@@ -864,6 +864,57 @@ class TestVideoService(unittest.TestCase):
         self.assertEqual(write_mock.call_count, 4)
         self.assertEqual(concat_mock.call_args.kwargs["max_duration"], 10.0)
 
+    def test_combine_videos_uses_fast_preset_and_threads_for_intermediate_clips(self):
+        """
+        逐段中间文件很快会被最终 ffmpeg concat 阶段重新编码一次，画质由那一次
+        编码决定。这里的编码只需要"够用"，所以默认软件编码器应该用更快的
+        preset，并且要带上调用方传入的 `threads`，而不是每次都用默认的
+        `medium` 预设单线程慢慢压。
+        """
+
+        class _FakeAudioClip:
+            duration = 3.0
+
+            def close(self):
+                pass
+
+        class _FakeVideoClip:
+            def __init__(self, duration):
+                self.duration = duration
+                self.size = (1080, 1920)
+                self.w = 1080
+                self.h = 1920
+
+            def subclipped(self, start_time, end_time):
+                return _FakeVideoClip(end_time - start_time)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            combined_video_path = os.path.join(temp_dir, "combined.mp4")
+
+            with (
+                patch.object(vd, "AudioFileClip", return_value=_FakeAudioClip()),
+                patch.object(
+                    vd,
+                    "_open_video_clip_quietly",
+                    return_value=_FakeVideoClip(3.0),
+                ),
+                patch.object(vd, "_write_videofile_with_codec_fallback") as write_mock,
+                patch.object(vd, "concat_video_clips_with_ffmpeg"),
+                patch.object(vd, "delete_files"),
+            ):
+                vd.combine_videos(
+                    combined_video_path=combined_video_path,
+                    video_paths=["clip-1.mp4"],
+                    audio_file=os.path.join(temp_dir, "audio.mp3"),
+                    video_concat_mode=vd.VideoConcatMode.sequential,
+                    video_transition_mode=None,
+                    max_clip_duration=10,
+                    threads=4,
+                )
+
+        self.assertEqual(write_mock.call_args.kwargs["threads"], 4)
+        self.assertEqual(write_mock.call_args.kwargs["preset"], "veryfast")
+
     def test_concat_video_clips_limits_output_to_audio_duration(self):
         """最终拼接时应裁到音频时长，避免安全余量带来明显静音尾巴。"""
 
@@ -985,6 +1036,20 @@ class TestVideoService(unittest.TestCase):
             self.assertIn("\n", wrapped_text_zh)
         except Exception as e:
             self.fail(f"test wrap_text failed: {str(e)}")
+
+    def test_arabic_subtitle_font_is_bundled_and_supports_arabic_text(self):
+        """
+        默认的 STHeiti/MicrosoftYaHei 字体面向 CJK 场景，阿拉伯语字幕需要专门
+        的字体才能正确显示（而不是显示成方块/问号）。这里验证项目自带的
+        Noto Naskh Arabic 字体文件存在，且确实覆盖阿拉伯语字形。
+        """
+        font_path = os.path.join(utils.font_dir(), "NotoNaskhArabic-Regular.ttf")
+        self.assertTrue(
+            os.path.exists(font_path), f"font file not found: {font_path}"
+        )
+
+        arabic_sample = "بسم الله الرحمن الرحيم"
+        self.assertTrue(vd.subtitle_font_supports_text(font_path, arabic_sample))
 
     def test_rounded_subtitle_background_clip_has_transparent_corners(self):
         """
