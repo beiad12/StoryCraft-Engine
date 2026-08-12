@@ -262,6 +262,14 @@ Open your browser and visit http://127.0.0.1:8080/docs or http://127.0.0.1:8080/
 
 #### ① Create a Python Virtual Environment
 
+**Easiest option:** run the installer script for your platform from the project root — it detects `uv` (preferred) or falls back to `venv` + `pip`, and also copies `config.example.toml` to `config.toml` on first run.
+
+- macOS: double-click `Install.command` (or run `./install.sh` in a terminal)
+- Linux: run `./install.sh` in a terminal
+- Windows: double-click `Install.bat` (or run it from CMD/PowerShell)
+
+Once it finishes, skip ahead to "② Launch the WebUI" below. The manual steps that follow do the same thing by hand, in case you'd rather control each step yourself.
+
 Use [uv](https://docs.astral.sh/uv/) to manage the Python environment and dependencies. The project supports Python 3.11 or later; the example below uses Python 3.11.
 
 ```shell

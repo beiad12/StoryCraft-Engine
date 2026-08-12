@@ -263,6 +263,14 @@ docker compose -f docker-compose.release.yml up
 
 #### ① 创建虚拟环境
 
+**最简单的方式：** 在项目根目录运行对应平台的安装脚本，它会自动优先使用 `uv`（未安装则回退到 `venv` + `pip`），并在首次运行时把 `config.example.toml` 复制为 `config.toml`。
+
+- macOS：双击 `Install.command`（或在终端运行 `./install.sh`）
+- Linux：在终端运行 `./install.sh`
+- Windows：双击 `Install.bat`（或在 CMD/PowerShell 中运行）
+
+安装完成后可以直接跳到下面的"② 启动 WebUI"。以下手动步骤是同样的操作过程，供想自己控制每一步的用户参考。
+
 推荐使用 [uv](https://docs.astral.sh/uv/) 管理 Python 环境和依赖。项目支持 Python 3.11 或更高版本，以下示例使用 Python 3.11。
 
 ```shell
