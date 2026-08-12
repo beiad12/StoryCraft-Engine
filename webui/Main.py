@@ -1923,7 +1923,47 @@ def _render_settings_dialog():
                     key=f"{llm_provider}_base_url_input",
                 )
             st_llm_model_name = ""
-            if llm_provider == "groq":
+            if llm_provider == "gemini":
+                # Gemini 的 Pro 档位是付费模型，很多用户只有免费额度可用。这里
+                # 提供一个"档位"快速选择器，默认命中 Registry 里的 Pro 默认值
+                # （保持历史行为不变），但可以一键切换到免费额度更友好的
+                # Flash / Flash-Lite，而不用去查具体模型名称怎么拼。选择
+                # "Custom" 时才退回到自由输入框，兼容用户想手填任意模型名。
+                gemini_tier_choices = [
+                    (tr("Gemini Pro (paid, most capable)"), "gemini-3.1-pro-preview"),
+                    (tr("Gemini Flash (fast, generous free tier)"), "gemini-3.1-flash-preview"),
+                    (
+                        tr("Gemini Flash-Lite (fastest, most free-tier friendly)"),
+                        "gemini-3.1-flash-lite-preview",
+                    ),
+                ]
+                gemini_tier_labels = [label for label, _ in gemini_tier_choices]
+                gemini_tier_model_ids = [model_id for _, model_id in gemini_tier_choices]
+                gemini_custom_label = tr("Custom")
+                gemini_tier_options = gemini_tier_labels + [gemini_custom_label]
+                if llm_model_name in gemini_tier_model_ids:
+                    gemini_tier_default_index = gemini_tier_model_ids.index(llm_model_name)
+                else:
+                    gemini_tier_default_index = len(gemini_tier_labels)
+
+                selected_gemini_tier_label = llm_form_panel.selectbox(
+                    tr("Model Tier"),
+                    options=gemini_tier_options,
+                    index=gemini_tier_default_index,
+                    key="gemini_model_tier_select",
+                )
+                if selected_gemini_tier_label == gemini_custom_label:
+                    st_llm_model_name = llm_form_panel.text_input(
+                        tr("Model Name"),
+                        value=llm_model_name,
+                        key=f"{llm_provider}_model_name_input",
+                    )
+                else:
+                    st_llm_model_name = gemini_tier_model_ids[
+                        gemini_tier_labels.index(selected_gemini_tier_label)
+                    ]
+                    llm_form_panel.caption(f"{tr('Model Name')}: {st_llm_model_name}")
+            elif llm_provider == "groq":
                 effective_api_key = st_llm_api_key or llm_api_key
                 effective_base_url = st_llm_base_url or llm_base_url
                 groq_models = get_groq_model_ids(
