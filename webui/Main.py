@@ -2426,6 +2426,20 @@ def _render_video_settings(panel, params):
                 config.app.pop("video_codec", None)
             else:
                 config.app["video_codec"] = selected_video_codec
+
+            # 请求模型的默认值是保守的 2，避免服务端同时跑多个任务时相互抢
+            # CPU；但 WebUI 通常只有用户自己在跑，把默认值提到当前机器的
+            # 核心数（有上限）能明显缩短每个视频片段和最终合成的编码时间，
+            # 之前完全没有入口调整，所有 WebUI 用户都被锁在 2 个线程上。
+            default_encoding_threads = min(8, max(2, os.cpu_count() or 2))
+            params.n_threads = st.slider(
+                tr("Encoding Threads"),
+                min_value=1,
+                max_value=max(8, os.cpu_count() or 8),
+                value=default_encoding_threads,
+                key="n_threads_slider",
+                help=tr("Encoding Threads Help"),
+            )
     return uploaded_files
 
 

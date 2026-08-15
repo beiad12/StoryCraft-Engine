@@ -378,6 +378,13 @@ def concat_video_clips_with_ffmpeg(
             "-pix_fmt",
             "yuv420p",
         ]
+        # 这里合并出的文件不是最终交付物——task.py 紧接着会把它交给
+        # generate_video() 叠加音频/字幕再编码一次。既然马上要被重新编码，
+        # 这一步就没必要用默认的 medium 预设精细压缩，换成 veryfast 能明显
+        # 缩短总耗时；只对软件编码器 libx264 生效，硬件编码器的预设取值
+        # 体系不同，传错值可能直接编码失败。
+        if codec == _DEFAULT_VIDEO_CODEC:
+            command.extend(["-preset", _INTERMEDIATE_CLIP_LIBX264_PRESET])
         if max_duration is not None and max_duration > 0:
             command.extend(["-t", f"{max_duration:.3f}"])
         command.append(output_file)

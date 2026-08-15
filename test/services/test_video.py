@@ -939,6 +939,61 @@ class TestVideoService(unittest.TestCase):
         self.assertEqual(command[command.index("-t") + 1], "10.000")
         self.assertLess(command.index("-t"), command.index(output_file))
 
+    def test_concat_video_clips_uses_fast_preset_for_libx264(self):
+        """
+        concat 阶段合并出的文件不是最终交付物，generate_video() 马上会
+        叠加音频/字幕再编码一次，所以这里应该用更快的 veryfast 预设，而不是
+        默认的 medium，避免整段视频被"精细压缩"两次拖慢总耗时。
+        """
+
+        def fake_run(command, capture_output, text, check):
+            return types.SimpleNamespace(returncode=0, stdout="", stderr="")
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            clip_file = os.path.join(temp_dir, "clip.mp4")
+            output_file = os.path.join(temp_dir, "combined.mp4")
+            Path(clip_file).write_bytes(b"fake")
+
+            with (
+                patch.object(vd, "_ffmpeg_encoder_exists", return_value=True),
+                patch.object(vd.subprocess, "run", side_effect=fake_run) as run,
+            ):
+                vd.concat_video_clips_with_ffmpeg(
+                    clip_files=[clip_file],
+                    output_file=output_file,
+                    threads=1,
+                    output_dir=temp_dir,
+                )
+
+        command = run.call_args.args[0]
+        self.assertEqual(command[command.index("-preset") + 1], "veryfast")
+
+    def test_concat_video_clips_skips_preset_for_hardware_codec(self):
+        """硬件编码器的预设取值体系不同，不应该被强行传 libx264 的 preset。"""
+        config.app["video_codec"] = "h264_nvenc"
+
+        def fake_run(command, capture_output, text, check):
+            return types.SimpleNamespace(returncode=0, stdout="", stderr="")
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            clip_file = os.path.join(temp_dir, "clip.mp4")
+            output_file = os.path.join(temp_dir, "combined.mp4")
+            Path(clip_file).write_bytes(b"fake")
+
+            with (
+                patch.object(vd, "_ffmpeg_encoder_exists", return_value=True),
+                patch.object(vd.subprocess, "run", side_effect=fake_run) as run,
+            ):
+                vd.concat_video_clips_with_ffmpeg(
+                    clip_files=[clip_file],
+                    output_file=output_file,
+                    threads=1,
+                    output_dir=temp_dir,
+                )
+
+        command = run.call_args.args[0]
+        self.assertNotIn("-preset", command)
+
     def test_prioritize_unique_source_clips_uses_each_source_before_reuse(self):
         """
         随机模式下，一个长素材会被拆成多个片段。调度层应先让每个源素材

@@ -83,6 +83,8 @@
     "Video Encoder": "Video-Encoder",
     "Default Video Encoder": "Standard (empfohlen)",
     "Video Encoder Help": "Erweiterte Option. Standard folgt der stabilen App-Vorgabe, derzeit libx264. Wenn ein Hardware-Encoder nicht verfügbar ist, fällt die App automatisch auf libx264 zurück.",
+    "Encoding Threads": "Encoding-Threads",
+    "Encoding Threads Help": "Wie viele CPU-Threads FFmpeg pro Videokodierung verwendet. Höhere Werte sind auf Mehrkernrechnern schneller, nutzen aber mehr CPU; bei gleichzeitig laufenden anderen aufwendigen Aufgaben niedriger einstellen.",
     "Audio Settings": "**Audio Einstellungen**",
     "Voiceover Mode": "Vertonungsmodus",
     "Automatic Voiceover": "Automatisch",

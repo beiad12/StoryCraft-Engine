@@ -286,6 +286,8 @@
     "Video Encoder": "Video Encoder",
     "Default Video Encoder": "Default (Recommended)",
     "Video Encoder Help": "Advanced option. Default follows the app's stable encoder policy, currently libx264. If a selected hardware encoder is unavailable, the app automatically falls back to libx264.",
+    "Encoding Threads": "Encoding Threads",
+    "Encoding Threads Help": "How many CPU threads FFmpeg uses per video encode. Higher values finish faster on multi-core machines but use more CPU; lower it if you run other heavy tasks at the same time.",
     "llm_provider_tips.ollama": "##### Ollama Configuration\n- **API Key**: not required\n- **Base Url**: usually `http://localhost:11434/v1` for local runs or `http://host.docker.internal:11434/v1` for Docker{docker_hint}\n- **Model Name**: required; run `ollama list` and enter an installed model, such as `qwen:7b`",
     "llm_provider_tips.ollama.docker_hint": "\n  > Container environment detected. If Base Url is empty, `http://host.docker.internal:11434/v1` is used by default.\n",
     "llm_provider_tips.openai": "##### OpenAI Configuration\n- **API Key**: create one on the [OpenAI Platform]({api_key_url})\n- **Base Url**: defaults to `{default_base_url}`; enter another endpoint when using a compatible service\n- **Model Name**: defaults to `{default_model}`; you can also enter another model ID available to your account\n> Accessing the official service may require a network proxy in some regions",

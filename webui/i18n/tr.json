@@ -279,6 +279,8 @@
     "Please Enter the Coverr API Key": "Lütfen **Coverr API Anahtarını** girin",
     "Video Encoder": "Video Kodlayıcı",
     "Default Video Encoder": "Varsayılan (Önerilen)",
-    "Video Encoder Help": "Gelişmiş seçenek. Varsayılan, uygulamanın kararlı kodlayıcı politikasını izler; şu anda libx264 kullanılır. Donanım kodlayıcı kullanılamıyorsa uygulama otomatik olarak libx264'e döner."
+    "Video Encoder Help": "Gelişmiş seçenek. Varsayılan, uygulamanın kararlı kodlayıcı politikasını izler; şu anda libx264 kullanılır. Donanım kodlayıcı kullanılamıyorsa uygulama otomatik olarak libx264'e döner.",
+    "Encoding Threads": "Kodlama İş Parçacıkları",
+    "Encoding Threads Help": "FFmpeg'in her video kodlamasında kaç CPU iş parçacığı kullanacağı. Yüksek değerler çok çekirdekli makinelerde daha hızlı biter ama daha fazla CPU kullanır; aynı anda başka ağır işler çalıştırıyorsanız düşürün."
   }
 }

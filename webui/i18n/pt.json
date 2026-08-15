@@ -279,6 +279,8 @@
     "Please Enter the Coverr API Key": "Por favor, insira a **Chave de API do Coverr**",
     "Video Encoder": "Codificador de vídeo",
     "Default Video Encoder": "Padrão (recomendado)",
-    "Video Encoder Help": "Opção avançada. Padrão segue a política estável do aplicativo, atualmente libx264. Se um codificador de hardware não estiver disponível, o aplicativo retorna automaticamente para libx264."
+    "Video Encoder Help": "Opção avançada. Padrão segue a política estável do aplicativo, atualmente libx264. Se um codificador de hardware não estiver disponível, o aplicativo retorna automaticamente para libx264.",
+    "Encoding Threads": "Threads de Codificação",
+    "Encoding Threads Help": "Quantas threads de CPU o FFmpeg usa em cada codificação de vídeo. Valores mais altos terminam mais rápido em máquinas com vários núcleos, mas usam mais CPU; reduza se estiver rodando outras tarefas pesadas ao mesmo tempo."
   }
 }
