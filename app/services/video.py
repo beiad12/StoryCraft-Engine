@@ -3,6 +3,7 @@ import io
 import os
 import random
 import gc
+import re
 import subprocess
 import sys
 import tempfile
@@ -35,6 +36,7 @@ from app.models.schema import (
     VideoTransitionMode,
 )
 from app.services import bgm as bgm_service
+from app.services import subtitle as subtitle_service
 from app.services.utils import video_effects
 from app.utils import file_security, utils
 
@@ -990,6 +992,93 @@ def subtitle_font_supports_text(font_path: str, text: str) -> bool:
     return _subtitle_font_supports_sample(font_path, sample)
 
 
+_ARABIC_SCRIPT_RE = re.compile(
+    "[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]"
+)
+_ARABIC_FALLBACK_FONT_FILENAME = "NotoNaskhArabic-Regular.ttf"
+
+
+def _contains_arabic_script(text: str) -> bool:
+    return bool(_ARABIC_SCRIPT_RE.search(text or ""))
+
+
+@lru_cache(maxsize=1)
+def _pillow_has_raqm_layout() -> bool:
+    """检查当前 Pillow 是否具备 libraqm（复杂文字整形/双向排版引擎）。
+
+    结果按进程缓存：这只取决于安装的 Pillow 构建方式，运行期间不会变化，
+    重复探测没有意义。
+    """
+    try:
+        from PIL import features
+
+        return bool(features.check("raqm"))
+    except Exception:
+        return False
+
+
+def _shape_arabic_text_for_basic_layout(text: str) -> str:
+    """
+    没有 libraqm 时，手动整形阿拉伯语文本，避免断开、乱序的字幕。
+
+    Pillow 从 9.2 起，只要检测到系统装有 libraqm 就会默认启用 RAQM 排版
+    引擎，自动完成阿拉伯语的字母连字（contextual shaping）和从右到左视觉
+    重排；MoviePy 的 TextClip 直接调用 `ImageFont.truetype()`，不会覆盖
+    这个默认值，所以大多数标准 Pillow 轮子上什么都不用做。但一些非官方
+    PyPI wheel 构建的 Pillow（比如某些系统包管理器打包版本）没有编译
+    libraqm，此时会静默退化为 BASIC 排版：字母以孤立形态逐个绘制，且不做
+    双向重排，看起来就是用户反馈里那种断开、顺序错乱的阿拉伯语字幕。
+    这里用 arabic_reshaper + python-bidi 手动完成同样的处理，只在探测到
+    确实没有 libraqm 时才启用，避免在已经有 libraqm 的环境里被"整形两次"
+    反而重新变乱。
+    """
+    try:
+        import arabic_reshaper
+        from bidi.algorithm import get_display
+
+        return get_display(arabic_reshaper.reshape(text))
+    except Exception as exc:
+        logger.warning(f"failed to shape arabic subtitle text, using raw text: {exc}")
+        return text
+
+
+def prepare_subtitle_text_for_rendering(text: str) -> str:
+    """字幕烧录前的阿拉伯语文本预处理入口，非阿拉伯语文本原样返回。"""
+    if not _contains_arabic_script(text):
+        return text
+    if _pillow_has_raqm_layout():
+        return text
+    return _shape_arabic_text_for_basic_layout(text)
+
+
+def resolve_subtitle_font_path(font_path: str, subtitle_text: str) -> str:
+    """
+    如果当前选中的字幕字体完全不支持字幕文本里的文字（最常见的场景是
+    默认的 CJK 字体 STHeiti/MicrosoftYaHei 遇到阿拉伯语字幕——这两款字体
+    根本不含阿拉伯语字形），自动回退到项目自带、明确支持阿拉伯语的
+    Noto Naskh Arabic 字体，而不是让用户在没有手动切换字体的情况下看到
+    大片缺字/方块。用户已经选择的字体只要本身支持该文字，就不做任何改动。
+    """
+    if not font_path or not os.path.exists(font_path):
+        return font_path
+    if not _contains_arabic_script(subtitle_text):
+        return font_path
+    if subtitle_font_supports_text(font_path, subtitle_text):
+        return font_path
+
+    fallback_font_path = os.path.join(utils.font_dir(), _ARABIC_FALLBACK_FONT_FILENAME)
+    if fallback_font_path == font_path or not os.path.exists(fallback_font_path):
+        return font_path
+    if not subtitle_font_supports_text(fallback_font_path, subtitle_text):
+        return font_path
+
+    logger.warning(
+        "selected subtitle font does not support Arabic script, "
+        f"falling back to {_ARABIC_FALLBACK_FONT_FILENAME}: {font_path}"
+    )
+    return fallback_font_path
+
+
 def generate_video(
     video_path: str,
     audio_path: str,
@@ -1027,6 +1116,15 @@ def generate_video(
         if os.name == "nt":
             font_path = font_path.replace("\\", "/")
 
+        if subtitle_path and os.path.exists(subtitle_path):
+            # 默认的 CJK 字体（STHeiti/MicrosoftYaHei）完全不包含阿拉伯语
+            # 字形。用户没有手动切换字体时，自动回退到项目自带的
+            # Noto Naskh Arabic，避免生成一段大片缺字的阿拉伯语字幕。
+            subtitle_full_text = "\n".join(
+                text for _, _, text in subtitle_service.file_to_subtitles(subtitle_path)
+            )
+            font_path = resolve_subtitle_font_path(font_path, subtitle_full_text)
+
         logger.info(f"  ⑤ font: {font_path}")
 
     def resolve_subtitle_background_color():
@@ -1040,7 +1138,7 @@ def generate_video(
     def create_text_clip(subtitle_item):
         params.font_size = int(params.font_size)
         params.stroke_width = int(params.stroke_width)
-        phrase = subtitle_item[1]
+        phrase = prepare_subtitle_text_for_rendering(subtitle_item[1])
         max_width = video_width * 0.9
         bg_color = resolve_subtitle_background_color()
         rounded_bg_enabled = bool(
@@ -1202,7 +1300,7 @@ def generate_video(
 
         def make_textclip(text):
             return TextClip(
-                text=text,
+                text=prepare_subtitle_text_for_rendering(text),
                 font=font_path,
                 font_size=params.font_size,
             )

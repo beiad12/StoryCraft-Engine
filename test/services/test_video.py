@@ -1051,6 +1051,81 @@ class TestVideoService(unittest.TestCase):
         arabic_sample = "بسم الله الرحمن الرحيم"
         self.assertTrue(vd.subtitle_font_supports_text(font_path, arabic_sample))
 
+    def test_resolve_subtitle_font_path_falls_back_for_arabic_when_cjk_font_selected(
+        self,
+    ):
+        """
+        默认字体是完全不含阿拉伯语字形的 CJK 字体。用户没有手动切换字体时，
+        遇到阿拉伯语字幕应该自动换成项目自带的 Noto Naskh Arabic，而不是让
+        WebUI 静默生成一段大片缺字的字幕。
+        """
+        cjk_font_path = os.path.join(utils.font_dir(), "STHeitiMedium.ttc")
+        arabic_text = "لا تنسَ أن تحفظ هذا الفيديو"
+
+        resolved = vd.resolve_subtitle_font_path(cjk_font_path, arabic_text)
+
+        self.assertEqual(
+            resolved,
+            os.path.join(utils.font_dir(), "NotoNaskhArabic-Regular.ttf"),
+        )
+
+    def test_resolve_subtitle_font_path_keeps_font_for_non_arabic_text(self):
+        """非阿拉伯语字幕不应该被强制换字体，即使当前字体是 CJK 字体。"""
+        cjk_font_path = os.path.join(utils.font_dir(), "STHeitiMedium.ttc")
+
+        resolved = vd.resolve_subtitle_font_path(cjk_font_path, "这是一段中文字幕")
+
+        self.assertEqual(resolved, cjk_font_path)
+
+    def test_resolve_subtitle_font_path_keeps_font_that_already_supports_arabic(self):
+        """已经支持阿拉伯语的字体（比如用户手动选的字体）不应该被替换。"""
+        arabic_font_path = os.path.join(utils.font_dir(), "NotoNaskhArabic-Regular.ttf")
+
+        resolved = vd.resolve_subtitle_font_path(
+            arabic_font_path, "لا تنسَ أن تحفظ هذا الفيديو"
+        )
+
+        self.assertEqual(resolved, arabic_font_path)
+
+    def test_prepare_subtitle_text_shapes_arabic_when_raqm_unavailable(self):
+        """
+        没有 libraqm 时，Pillow 的 BASIC 排版不会做阿拉伯语连字和从右到左
+        重排，MoviePy 的 TextClip 会把字幕画成断开、顺序错乱的孤立字母
+        （用户反馈的截图正是这种效果）。这里模拟"没有 libraqm"的环境，
+        验证会改用 arabic_reshaper + python-bidi 手动整形。
+        """
+        text = "لا تنسَ أن تحفظ هذا الفيديو"
+
+        with patch.object(vd, "_pillow_has_raqm_layout", return_value=False):
+            shaped = vd.prepare_subtitle_text_for_rendering(text)
+
+        self.assertNotEqual(shaped, text)
+
+        import arabic_reshaper
+        from bidi.algorithm import get_display
+
+        self.assertEqual(shaped, get_display(arabic_reshaper.reshape(text)))
+
+    def test_prepare_subtitle_text_leaves_text_untouched_when_raqm_available(self):
+        """
+        有 libraqm 时 Pillow 会自己做整形和重排；这里再手动整形一次反而会
+        把已经处理好的文字弄乱（"整形两次"问题），所以必须原样跳过。
+        """
+        text = "لا تنسَ أن تحفظ هذا الفيديو"
+
+        with patch.object(vd, "_pillow_has_raqm_layout", return_value=True):
+            shaped = vd.prepare_subtitle_text_for_rendering(text)
+
+        self.assertEqual(shaped, text)
+
+    def test_prepare_subtitle_text_ignores_non_arabic_text(self):
+        text = "This is plain English text."
+
+        with patch.object(vd, "_pillow_has_raqm_layout", return_value=False):
+            shaped = vd.prepare_subtitle_text_for_rendering(text)
+
+        self.assertEqual(shaped, text)
+
     def test_rounded_subtitle_background_clip_has_transparent_corners(self):
         """
         圆角字幕背景只在用户显式开启时使用。这里直接验证生成的 RGBA
